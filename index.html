@@ -15,7 +15,7 @@
 <body>
 
     <h1>EEDI Misconception DB</h1>
-    <p id="status">데이터를 불러오는 중...</p>
+    <p id="status">데이터를 불러오는 중입니다...</p>
 
     <div class="card">
         <h3 id="idField">ID: -</h3>
@@ -33,24 +33,21 @@
     </div>
 
     <script>
-        // 직접 Raw 주소로 접근 (프록시 사용 안 함)
-        const CSV_URL = 'https://raw.githubusercontent.com/sy-muscat/eedi-db/main/misconception_mapping.csv';
+        // GitHub Raw 대신 jsDelivr CDN을 사용하면 CORS 문제가 해결됩니다.
+        const CSV_URL = 'https://cdn.jsdelivr.net/gh/sy-muscat/eedi-db/misconception_mapping.csv';
         
         let data = [];
         let currentIndex = 0;
 
         window.onload = async function() {
             try {
-                // 프록시 없이 직접 fetch
+                // 데이터를 텍스트로 바로 fetch
                 const response = await fetch(CSV_URL);
-                if (!response.ok) throw new Error("파일을 찾을 수 없습니다.");
-                
-                // 텍스트로 직접 읽기 (JSON 변환 과정 없음)
+                if (!response.ok) throw new Error("네트워크 오류");
                 const text = await response.text();
                 
                 const lines = text.split(/\r?\n/);
                 data = [];
-                
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
@@ -68,7 +65,6 @@
                 const hashId = window.location.hash.substring(1);
                 const index = data.findIndex(i => i.id == hashId);
                 currentIndex = (index !== -1) ? index : 0;
-                
                 render();
             } catch (e) {
                 document.getElementById('status').innerText = "데이터 로드 실패: " + e.message;
@@ -88,7 +84,7 @@
                     const json = await res.json();
                     document.getElementById('translatedField').innerText = json[0].map(i => i[0]).join("");
                 } catch (e) {
-                    document.getElementById('translatedField').innerText = "번역 서비스 연결 실패";
+                    document.getElementById('translatedField').innerText = "번역 불가";
                 }
             }
         }
