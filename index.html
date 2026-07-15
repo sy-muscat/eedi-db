@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>EEDI Misconception DB</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; }
+        .card { border: 2px solid #333; padding: 25px; margin: 20px auto; width: 80%; max-width: 700px; border-radius: 8px; background-color: #f9f9f9; text-align: left; }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; margin: 5px; }
+        #jumpId { padding: 8px; width: 100px; }
+        #misconceptionField, #translatedField { font-family: 'Courier New', Courier, monospace; background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-top: 5px; }
+        #rangeLabel { font-size: 0.9em; color: #666; margin-top: 5px; display: block; }
+    </style>
+</head>
+<body>
+
+    <h1>EEDI Misconception DB</h1>
+    <input type="file" id="csvFile" accept=".csv"><br><br>
+
+    <div class="card">
+        <h3 id="idField">ID: -</h3>
+        <p><strong>Original:</strong></p>
+        <div id="misconceptionField">-</div>
+        <p><strong>한국어 번역:</strong></p>
+        <div id="translatedField">-</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="prev()">◀ 이전</button>
+        <input type="number" id="jumpId" placeholder="ID 입력">
+        <button onclick="jump()">이동</button>
+        <button onclick="next()">다음 ▶</button>
+        <span id="rangeLabel">파일을 업로드하면 범위가 표시됩니다.</span>
+    </div>
+
+    <script>
+        let data = [];
+        let currentIndex = 0;
+
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                // CSV 파싱 로직 개선: 따옴표 안의 콤마를 보호하며 줄별로 분리
+                const rows = text.match(/(".*?"|[^,\r\n]+)(?=\s*,|\s*$)/g) ? text.split(/\r?\n/) : [];
+                
+                data = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i].trim();
+                    if (!row) continue;
+                    
+                    // 정규식을 사용하여 따옴표로 묶인 내용을 정확히 추출
+                    const cols = row.match(/(".*?"|[^,]+)/g);
+                    if (cols && cols.length >= 2) {
+                        data.push({
+                            id: cols[0].replace(/^"|"$/g, '').trim(),
+                            text: cols[1].replace(/^"|"$/g, '').trim()
+                        });
+                    }
+                }
+
+                if (data.length > 0) {
+                    currentIndex = 0;
+                    document.getElementById('rangeLabel').innerText = `ID 범위: ${data[0].id} ~ ${data[data.length - 1].id} (총 ${data.length}개)`;
+                    render();
+                } else {
+                    alert("데이터를 읽을 수 없습니다. CSV 파일 형식을 확인해주세요.");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        async function translateText(text) {
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(text)}`;
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                return result[0].map(item => item[0]).join("");
+            } catch (e) { return "번역 실패"; }
+        }
+
+        async function render() {
+            if (data[currentIndex]) {
+                const item = data[currentIndex];
+                document.getElementById('idField').innerText = 'ID: ' + item.id;
+                document.getElementById('misconceptionField').innerText = item.text;
+                
+                document.getElementById('translatedField').innerText = "번역 중...";
+                const translated = await translateText(item.text);
+                document.getElementById('translatedField').innerText = translated;
+            }
+        }
+
+        function prev() { if (currentIndex > 0) { currentIndex--; render(); } }
+        function next() { if (currentIndex < data.length - 1) { currentIndex++; render(); } }
+        function jump() {
+            const targetId = document.getElementById('jumpId').value;
+            const index = data.findIndex(i => i.id == targetId);
+            if (index !== -1) { currentIndex = index; render(); }
+            else alert("해당 ID를 찾을 수 없습니다.");
+        }
+    </script>
+</body>
+</html>
