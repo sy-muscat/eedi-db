@@ -35,7 +35,8 @@
     <script>
         // 프록시 URL을 사용하여 CORS 우회
         const TARGET_URL = 'https://raw.githubusercontent.com/sy-muscat/eedi-db/main/misconception_mapping.csv';
-        const PROXY_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent(TARGET_URL);
+        //const PROXY_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent(TARGET_URL);
+        const PROXY_URL = 'https://corsproxy.io/?' + encodeURIComponent(TARGET_URL);
         
         let data = [];
         let currentIndex = 0;
