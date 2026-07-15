@@ -10,13 +10,12 @@
         button { padding: 10px 20px; cursor: pointer; margin: 5px; }
         #jumpId { padding: 8px; width: 100px; }
         #misconceptionField, #translatedField { font-family: 'Courier New', Courier, monospace; background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-top: 5px; }
-        #rangeLabel { font-size: 0.9em; color: #666; margin-top: 5px; display: block; }
     </style>
 </head>
 <body>
 
     <h1>EEDI Misconception DB</h1>
-    <input type="file" id="csvFile" accept=".csv"><br><br>
+    <p id="status">데이터를 불러오는 중...</p>
 
     <div class="card">
         <h3 id="idField">ID: -</h3>
@@ -31,54 +30,44 @@
         <input type="number" id="jumpId" placeholder="ID 입력">
         <button onclick="jump()">이동</button>
         <button onclick="next()">다음 ▶</button>
-        <span id="rangeLabel">파일을 업로드하면 범위가 표시됩니다.</span>
     </div>
 
     <script>
+        // [수정 필요] 여기에 GitHub의 'Raw' CSV 주소를 넣으세요
+        const CSV_URL = 'https://raw.githubusercontent.com/아이디/저장소/main/misconception_mapping.csv';
+        
         let data = [];
         let currentIndex = 0;
 
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                // CSV 파싱 로직 개선: 따옴표 안의 콤마를 보호하며 줄별로 분리
-                const rows = text.match(/(".*?"|[^,\r\n]+)(?=\s*,|\s*$)/g) ? text.split(/\r?\n/) : [];
-                
-                data = [];
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i].trim();
-                    if (!row) continue;
-                    
-                    // 정규식을 사용하여 따옴표로 묶인 내용을 정확히 추출
-                    const cols = row.match(/(".*?"|[^,]+)/g);
-                    if (cols && cols.length >= 2) {
-                        data.push({
-                            id: cols[0].replace(/^"|"$/g, '').trim(),
-                            text: cols[1].replace(/^"|"$/g, '').trim()
-                        });
-                    }
-                }
-
-                if (data.length > 0) {
-                    currentIndex = 0;
-                    document.getElementById('rangeLabel').innerText = `ID 범위: ${data[0].id} ~ ${data[data.length - 1].id} (총 ${data.length}개)`;
-                    render();
-                } else {
-                    alert("데이터를 읽을 수 없습니다. CSV 파일 형식을 확인해주세요.");
-                }
-            };
-            reader.readAsText(file);
-        });
-
-        async function translateText(text) {
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(text)}`;
+        // 페이지가 열리면 자동으로 CSV 로드
+        window.onload = async function() {
             try {
-                const response = await fetch(url);
-                const result = await response.json();
-                return result[0].map(item => item[0]).join("");
-            } catch (e) { return "번역 실패"; }
+                const response = await fetch(CSV_URL);
+                const text = await response.text();
+                const rows = text.split(/\r?\n/).slice(1);
+                
+                data = rows.filter(r => r.trim()).map(row => {
+                    const cols = row.match(/(".*?"|[^,]+)/g);
+                    return { 
+                        id: cols[0].replace(/"/g, '').trim(), 
+                        text: cols[1].replace(/"/g, '').trim() 
+                    };
+                });
+                
+                document.getElementById('status').innerText = `데이터 ${data.length}개 로드 완료`;
+                checkUrlHash();
+            } catch (e) {
+                document.getElementById('status').innerText = "데이터 불러오기 실패!";
+            }
+        };
+
+        function checkUrlHash() {
+            const hashId = window.location.hash.substring(1);
+            if (hashId) {
+                const index = data.findIndex(i => i.id == hashId);
+                if (index !== -1) currentIndex = index;
+            }
+            render();
         }
 
         async function render() {
@@ -87,19 +76,23 @@
                 document.getElementById('idField').innerText = 'ID: ' + item.id;
                 document.getElementById('misconceptionField').innerText = item.text;
                 
+                // 주소창 업데이트 (워드 링크용)
+                window.location.hash = item.id;
+                
                 document.getElementById('translatedField').innerText = "번역 중...";
-                const translated = await translateText(item.text);
-                document.getElementById('translatedField').innerText = translated;
+                const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(item.text)}`);
+                const json = await res.json();
+                document.getElementById('translatedField').innerText = json[0].map(i => i[0]).join("");
             }
         }
 
         function prev() { if (currentIndex > 0) { currentIndex--; render(); } }
         function next() { if (currentIndex < data.length - 1) { currentIndex++; render(); } }
         function jump() {
-            const targetId = document.getElementById('jumpId').value;
-            const index = data.findIndex(i => i.id == targetId);
+            const val = document.getElementById('jumpId').value;
+            const index = data.findIndex(i => i.id == val);
             if (index !== -1) { currentIndex = index; render(); }
-            else alert("해당 ID를 찾을 수 없습니다.");
+            else alert("ID를 찾을 수 없습니다.");
         }
     </script>
 </body>
