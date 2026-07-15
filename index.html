@@ -15,7 +15,7 @@
 <body>
 
     <h1>EEDI Misconception DB</h1>
-    <p id="status">데이터를 불러오는 중입니다...</p>
+    <p id="status">데이터를 불러오는 중...</p>
 
     <div class="card">
         <h3 id="idField">ID: -</h3>
@@ -33,20 +33,21 @@
     </div>
 
     <script>
-        // 프록시 URL을 사용하여 CORS 우회
         const TARGET_URL = 'https://raw.githubusercontent.com/sy-muscat/eedi-db/main/misconception_mapping.csv';
-        //const PROXY_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent(TARGET_URL);
-        const PROXY_URL = 'https://corsproxy.io/?' + encodeURIComponent(TARGET_URL);
+        // 이번에는 더 안정적인 cors-anywhere 스타일의 무료 프록시를 사용합니다.
+        const PROXY_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent(TARGET_URL);
         
         let data = [];
         let currentIndex = 0;
 
         window.onload = async function() {
             try {
-                const response = await fetch(PROXY_URL);
-                if (!response.ok) throw new Error("네트워크 연결 실패");
+                // cache: 'reload'를 사용하여 브라우저 캐시를 무시하고 무조건 서버에서 받아옴
+                const response = await fetch(PROXY_URL, { cache: 'reload', headers: { 'Cache-Control': 'no-cache' }});
+                if (!response.ok) throw new Error("서버 응답 오류");
+                
                 const json = await response.json();
-                const text = json.contents; // 프록시가 가져온 실제 텍스트 내용
+                const text = json.contents;
                 
                 const lines = text.split(/\r?\n/);
                 data = [];
@@ -54,7 +55,6 @@
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
-
                     const cols = line.match(/(".*?"|[^,]+)/g);
                     if (cols && cols.length >= 2) {
                         data.push({ 
@@ -64,24 +64,21 @@
                     }
                 }
                 
-                if (data.length === 0) throw new Error("CSV 데이터가 없습니다.");
-                
                 document.getElementById('status').innerText = `데이터 ${data.length}개 로드 성공`;
-                checkUrlHash();
+                
+                // 해시가 없으면 첫 번째 데이터로 초기화
+                const hashId = window.location.hash.substring(1);
+                if (hashId) {
+                    const index = data.findIndex(i => i.id == hashId);
+                    if (index !== -1) currentIndex = index;
+                } else {
+                    currentIndex = 0;
+                }
+                render();
             } catch (e) {
                 document.getElementById('status').innerText = "데이터 로드 실패: " + e.message;
             }
         };
-
-        // (이후 함수들은 동일합니다)
-        function checkUrlHash() {
-            const hashId = window.location.hash.substring(1);
-            if (hashId) {
-                const index = data.findIndex(i => i.id == hashId);
-                if (index !== -1) currentIndex = index;
-            }
-            render();
-        }
 
         async function render() {
             if (data[currentIndex]) {
